@@ -239,7 +239,7 @@ for shape in shapes_to_show:
 # This helps fit the data onto the page while maintaining readability
 st.dataframe(
     flat_coord_data, 
-    use_container_width=True,
+    width='stretch',
     column_config={
         "Shape": st.column_config.TextColumn("Shape", width="medium"),
         "Mic": st.column_config.TextColumn("Mic", width="small"),
