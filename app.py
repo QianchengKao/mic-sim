@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -7,6 +8,25 @@ from geometry import get_mic_layout, get_polygon_data
 st.set_page_config(page_title="Microphone Array Simulator", layout="wide")
 
 st.title("Microphone Array Simulator")
+
+# --- Export Report Feature ---
+if st.button("📄 Export Report (Print as PDF)"):
+    # Inject CSS to hide Streamlit header, footer, and buttons during print
+    print_styles = """
+    <style>
+        @media print {
+            .stButton, header, footer, [data-testid="stToolbar"], .stInfo {
+                display: none !important;
+            }
+            .main {
+                padding-top: 0 !important;
+            }
+        }
+    </style>
+    <script>window.print();</script>
+    """
+    components.html(print_styles, height=0)
+    st.info("💡 Tip: Select 'Save as PDF' in the browser Print destination. (Some browsers need a click inside the page first)")
 
 # --- Simple Design Parameters ---
 # Use session state for R to maintain D=2R relationship
@@ -248,8 +268,10 @@ st.dataframe(
     }
 )
 
-# Also provide a Python-ready format in an expander
+# Show Python Code Format (Array of Arrays) in an expander
 with st.expander("Show Python Code Format (Array of Arrays)"):
+    # (Existing code for Python export)
+    # ...
     code_str = "# Sub-array Coordinate Dictionary (X-Up, Y-Left)\n"
     code_str += "mic_configs = {\n"
     for shape in shapes_to_show:
@@ -263,5 +285,23 @@ with st.expander("Show Python Code Format (Array of Arrays)"):
     st.code(code_str, language='python')
 
 st.divider()
+
+# --- Summary Shape Table for the Report ---
+st.subheader("Sub-array Geometry Summary (Sides & Angles)")
+summary_data = []
+for shape in shapes_to_show:
+    indices = shape["indices"]
+    data = get_polygon_data(mics, indices)
+    summary_data.append({
+        "Shape Name": shape["name"],
+        "Side Lengths [mm]": ", ".join([f"{s:.1f}" for s in data['sides']]),
+        "Interior Angles [°]": ", ".join([f"{a:.1f}" for a in data['angles']])
+    })
+
+st.table(summary_data)  # Use st.table for the printable report instead of st.dataframe
+
 st.success("All 12 shapes and precision coordinates are ready.")
 
+# Quick Re-trigger Button at the bottom for convenience
+if st.button("📄 Print Page as Report"):
+    components.html("<script>window.print();</script>", height=0)
