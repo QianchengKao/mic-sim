@@ -41,25 +41,36 @@ if st.button("📄 Export Report (Print as PDF)"):
     st.info("💡 Tip: Select 'Save as PDF' in the browser Print destination. (Some browsers need a click inside the page first)")
 
 # --- Simple Design Parameters ---
-# Use session state for R to maintain D=2R relationship
 if 'r_val' not in st.session_state:
     st.session_state.r_val = 50.0
 
 if 'd_val' not in st.session_state:
     st.session_state.d_val = 100.0
 
-def update_r_from_d():
-    st.session_state.r_val = st.session_state.d_val / 2.0
+if 'l_val' not in st.session_state:
+    st.session_state.l_val = round(50.0 * np.sqrt(3), 2)
 
-def update_d_from_r():
+def update_from_r():
+    st.session_state.d_val = st.session_state.r_val * 2.0
+    st.session_state.l_val = round(st.session_state.r_val * np.sqrt(3), 2)
+
+def update_from_d():
+    st.session_state.r_val = st.session_state.d_val / 2.0
+    st.session_state.l_val = round(st.session_state.r_val * np.sqrt(3), 2)
+
+def update_from_l():
+    st.session_state.r_val = st.session_state.l_val / np.sqrt(3)
     st.session_state.d_val = st.session_state.r_val * 2.0
 
-col_r, col_d = st.columns(2)
+col_r, col_d, col_l = st.columns(3)
 with col_r:
-    st.number_input("Radius R (mm)", min_value=0.5, step=0.5, key="r_val", on_change=update_d_from_r)
+    st.number_input("Radius R (mm)", min_value=0.5, step=0.5, key="r_val", on_change=update_from_r)
 
 with col_d:
-    st.number_input("Diameter D (mm)", min_value=1.0, step=1.0, key="d_val", on_change=update_r_from_d)
+    st.number_input("Diameter D (mm)", min_value=1.0, step=1.0, key="d_val", on_change=update_from_d)
+
+with col_l:
+    st.number_input("Triangle side L (M1-M3-M5) [mm]", min_value=1.0, step=1.0, key="l_val", on_change=update_from_l)
 
 # Final radius to use
 final_r = st.session_state.r_val
