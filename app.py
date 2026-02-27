@@ -7,6 +7,18 @@ from geometry import get_mic_layout, get_polygon_data
 
 st.set_page_config(page_title="Microphone Array Simulator", layout="wide")
 
+# --- Hide Streamlit Header, Footer, and Profile ---
+hide_st_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    [data-testid="stHeader"] {display: none;}
+    [data-testid="stToolbar"] {display: none;}
+    </style>
+"""
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
 st.title("Microphone Array Simulator")
 
 # --- Export Report Feature ---
