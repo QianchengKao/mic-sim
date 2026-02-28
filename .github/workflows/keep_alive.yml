@@ -1,0 +1,17 @@
+name: Keep App Alive
+
+on:
+  schedule:
+    # Runs every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit App
+        run: |
+          # Replace the URL below with your actual Streamlit app URL
+          URL="https://mic-sim.streamlit.app"
+          curl -s --head $URL | head -n 1
