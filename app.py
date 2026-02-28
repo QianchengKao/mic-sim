@@ -74,6 +74,45 @@ def get_mic_layout(R):
 
 mics = get_mic_layout(final_r)
 
+    ])
+
+def get_polygon_data(mics, indices):
+    """Calculates sides, internal angles and vertices for a given subset of mics."""
+    subset = []
+    for m_idx in indices:
+        subset.append(mics[m_idx])
+    v_coords = np.array(subset)
+    num_v = len(v_coords)
+    
+    # Sides (Chord lengths)
+    sides = []
+    for i in range(num_v):
+        p1 = v_coords[i]
+        p2 = v_coords[(i+1) % num_v]
+        sides.append(np.linalg.norm(p1 - p2))
+    
+    # Angles (Law of Cosines or Atan2)
+    angles = []
+    for i in range(num_v):
+        p_prev = v_coords[(i-1) % num_v]
+        p_curr = v_coords[i]
+        p_next = v_coords[(i+1) % num_v]
+        
+        v1 = p_prev - p_curr
+        v2 = p_next - p_curr
+        
+        dot = np.dot(v1, v2)
+        m1 = np.linalg.norm(v1)
+        m2 = np.linalg.norm(v2)
+        
+        if m1 < 1e-6 or m2 < 1e-6:
+            angles.append(0.0)
+        else:
+            cos_val = np.clip(dot / (m1 * m2), -1.0, 1.0)
+            angles.append(np.degrees(np.arccos(cos_val)))
+            
+    return {'sides': sides, 'angles': angles, 'vertices': v_coords}
+
 # --- PDF Generation Function ---
 def create_pdf_report(mics, r_val, d_val, shapes, polygon_func):
     buffer = io.BytesIO()
