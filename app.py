@@ -59,6 +59,21 @@ with col_l:
 final_r = st.session_state.r_val
 mics = get_mic_layout(final_r)
 
+# 2. Geometry Core Logic
+def get_mic_layout(R):
+    """Calculates the 8-mic standard coordinates (px, py)."""
+    SQRT3 = np.sqrt(3)
+    return np.array([
+        [R, 0],                             # M1
+        [R/2, -R*SQRT3/2],                  # M2
+        [-R/2, -R*SQRT3/2],                 # M3
+        [-R, 0],                            # M4 
+        [-R/2, R*SQRT3/2],                  # M5
+        [R/2, R*SQRT3/2],                   # M6
+        [R/2 + (SQRT3-1)*R, R*SQRT3/2],     # M7
+        [R/2 + (SQRT3-1)*R, -R*SQRT3/2],    # M8
+    ])
+
 # --- PDF Generation Function ---
 def create_pdf_report(mics, r_val, d_val, shapes, polygon_func):
     buffer = io.BytesIO()
