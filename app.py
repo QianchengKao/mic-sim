@@ -64,7 +64,7 @@ def get_mic_layout(R):
     """Calculates the 8-mic standard coordinates (px, py)."""
     SQRT3 = np.sqrt(3)
     return np.array([
-        [R, 0],                             # M1
+        [R, 0],                             # M
         [R/2, -R*SQRT3/2],                  # M2
         [-R/2, -R*SQRT3/2],                 # M3
         [-R, 0],                            # M4 
@@ -193,18 +193,22 @@ with col_e1:
         st.success("✅ Layout optimized. You can now use your browser's print shortcut (Cmd+P or Ctrl+P) to save as PDF.")
 
 with col_e2:
-    try:
-        stp_data = generate_stp_model(mics)
-        st.download_button(
-            label="📐 Download 3D STEP Model (.stp)",
-            data=stp_data,
-            file_name=f"MicArray_3D_Model_R{final_r}.step",
-            mime="application/step",
-            help="Generate a 3D model with 3.5x2.65x1mm blocks centered at each mic coordinate."
-        )
-        st.caption("Blocks: 3.5 x 2.65 x 1 mm | Coordinate: Center-aligned")
-    except Exception as e:
-        st.error(f"3D Export Error: {str(e)}")
+    # 简化在线版：仅保留 CSV 坐标导出，移除 STP/DXF 避免云端报错
+    # 3D 导出已通过本地脚本 generate_3d_report.py 实现
+    csv_coords = []
+    for i, (mx, my) in enumerate(mics):
+        csv_coords.append({"Mic": f"M{i+1}", "X": round(my, 6), "Y": round(-mx, 6)})
+    df_download = pd.DataFrame(csv_coords)
+    csv_data = df_download.to_csv(index=False).encode('utf-8')
+    
+    st.download_button(
+        label="📥 Download Coordinates CSV",
+        data=csv_data,
+        file_name=f"mic_coords_R{final_r}mm.csv",
+        mime="text/csv",
+        help="Export all 8 coordinates to a CSV file (X-Up, Y-Left system)."
+    )
+    st.info("💡 3D models (STP/DXF) are generated locally using the provided scripts for maximum reliability.")
 
 # --- Array Layout Diagram & Coordinates ---
 st.subheader("Microphone Array Layout & Coordinates")
