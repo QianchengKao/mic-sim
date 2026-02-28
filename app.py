@@ -22,34 +22,27 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 st.title("Microphone Array Simulator")
 
 # --- Export Report Feature ---
-if st.button("📄 Print Page / Save as PDF"):
-    # Inject CSS and trigger print after a small delay to ensure UI handles it
+if st.button("📄 Prepare Report for Printing"):
+    st.info("ℹ️ To save as PDF: 1. Press **Ctrl + P** (Win) or **Cmd + P** (Mac) manually. 2. Set 'Destination' to 'Save as PDF'.")
+    # Simplify page for printing
     print_styles = """
-    <style>
-        @media print {
-            /* Hide UI elements */
-            .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"] {
-                display: none !important;
+        <style>
+            @media print {
+                .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"], #MainMenu {
+                    display: none !important;
+                }
+                .main .block-container {
+                    padding-top: 0 !important;
+                    max-width: 100% !important;
+                }
+                div[data-testid="stPyplot"], .stTable {
+                    page-break-inside: avoid;
+                }
             }
-            /* Reset container padding */
-            .main .block-container {
-                padding: 0 !important;
-            }
-            /* Ensure charts and tables don't get cut off */
-            div[data-testid="stPyplot"] {
-                page-break-inside: avoid;
-            }
-        }
-    </style>
-    <script>
-        // Use a slight delay to ensure the browser has actually finished rendering any triggered changes
-        setTimeout(function() {
-            window.print();
-        }, 500);
-    </script>
+        </style>
     """
     st.markdown(print_styles, unsafe_allow_html=True)
-    st.info("💡 Tip: Set 'Destination' to 'Save as PDF' in the print window.")
+    st.success("✅ Page is now optimized for printing. Please use your browser's print shortcut (Cmd+P or Ctrl+P).")
 
 # --- Simple Design Parameters ---
 if 'r_val' not in st.session_state:
