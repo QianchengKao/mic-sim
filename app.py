@@ -22,23 +22,34 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 st.title("Microphone Array Simulator")
 
 # --- Export Report Feature ---
-if st.button("📄 Export Report (Print as PDF)"):
-    # Inject CSS to hide Streamlit header, footer, and buttons during print
+if st.button("📄 Print Page / Save as PDF"):
+    # Inject CSS and trigger print after a small delay to ensure UI handles it
     print_styles = """
     <style>
         @media print {
-            .stButton, header, footer, [data-testid="stToolbar"], .stInfo {
+            /* Hide UI elements */
+            .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"] {
                 display: none !important;
             }
-            .main {
-                padding-top: 0 !important;
+            /* Reset container padding */
+            .main .block-container {
+                padding: 0 !important;
+            }
+            /* Ensure charts and tables don't get cut off */
+            div[data-testid="stPyplot"] {
+                page-break-inside: avoid;
             }
         }
     </style>
-    <script>window.print();</script>
+    <script>
+        // Use a slight delay to ensure the browser has actually finished rendering any triggered changes
+        setTimeout(function() {
+            window.print();
+        }, 500);
+    </script>
     """
-    components.html(print_styles, height=0)
-    st.info("💡 Tip: Select 'Save as PDF' in the browser Print destination. (Some browsers need a click inside the page first)")
+    st.markdown(print_styles, unsafe_allow_html=True)
+    st.info("💡 Tip: Set 'Destination' to 'Save as PDF' in the print window.")
 
 # --- Simple Design Parameters ---
 if 'r_val' not in st.session_state:
