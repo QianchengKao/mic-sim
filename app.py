@@ -56,7 +56,6 @@ with col_l:
 
 # Final radius to use
 final_r = st.session_state.r_val
-mics = get_mic_layout(final_r)
 
 # 2. Geometry Core Logic
 def get_mic_layout(R):
@@ -72,6 +71,8 @@ def get_mic_layout(R):
         [R/2 + (SQRT3-1)*R, R*SQRT3/2],     # M7
         [R/2 + (SQRT3-1)*R, -R*SQRT3/2],    # M8
     ])
+
+mics = get_mic_layout(final_r)
 
 # --- PDF Generation Function ---
 def create_pdf_report(mics, r_val, d_val, shapes, polygon_func):
