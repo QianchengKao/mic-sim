@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import io
+import cadquery as cq
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -151,33 +152,49 @@ def create_pdf_report(mics, r_val, d_val, shapes, polygon_func):
     buffer.seek(0)
     return buffer
 
-# --- Export Report Feature ---
-st.subheader("📊 Report Center")
+# --- Export Report & 3D Model ---
+st.subheader("📊 Tool Center")
+col_e1, col_e2 = st.columns(2)
 
-if st.button("🖨️ Prepare Page for Printing (PDF Mode)"):
-    st.info("ℹ️ To save as PDF: 1. Press **Ctrl + P** (Win) or **Cmd + P** (Mac) manually. 2. Set 'Destination' to 'Save as PDF'.")
-    # Simplify page for printing and force page breaks correctly
-    print_styles = """
-        <style>
-            @media print {
-                /* Hide navigation, buttons and extra UI */
-                .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"], #MainMenu {
-                    display: none !important;
+with col_e1:
+    if st.button("🖨️ Prepare Page for Printing (PDF Mode)"):
+        st.info("ℹ️ To save as PDF: 1. Press **Ctrl + P** (Win) or **Cmd + P** (Mac) manually. 2. Set 'Destination' to 'Save as PDF'.")
+        # Simplify page for printing and force page breaks correctly
+        print_styles = """
+            <style>
+                @media print {
+                    /* Hide navigation, buttons and extra UI */
+                    .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"], #MainMenu {
+                        display: none !important;
+                    }
+                    /* Reset page margins and container width */
+                    .main .block-container {
+                        padding-top: 10mm !important;
+                        padding-bottom: 10mm !important;
+                        max-width: 100% !important;
+                    }
+                    /* Space out sections */
+                    stDivider { page-break-after: always; }
+                    div[data-testid="stPyplot"] { page-break-inside: avoid; margin-bottom: 20px; }
                 }
-                /* Reset page margins and container width */
-                .main .block-container {
-                    padding-top: 10mm !important;
-                    padding-bottom: 10mm !important;
-                    max-width: 100% !important;
-                }
-                /* Space out sections */
-                stDivider { page-break-after: always; }
-                div[data-testid="stPyplot"] { page-break-inside: avoid; margin-bottom: 20px; }
-            }
-        </style>
-    """
-    st.markdown(print_styles, unsafe_allow_html=True)
-    st.success("✅ Layout optimized. You can now use your browser's print shortcut (Cmd+P or Ctrl+P) to save as PDF.")
+            </style>
+        """
+        st.markdown(print_styles, unsafe_allow_html=True)
+        st.success("✅ Layout optimized. You can now use your browser's print shortcut (Cmd+P or Ctrl+P) to save as PDF.")
+
+with col_e2:
+    try:
+        stp_data = generate_stp_model(mics)
+        st.download_button(
+            label="📐 Download 3D STEP Model (.stp)",
+            data=stp_data,
+            file_name=f"MicArray_3D_Model_R{final_r}.step",
+            mime="application/step",
+            help="Generate a 3D model with 3.5x2.65x1mm blocks centered at each mic coordinate."
+        )
+        st.caption("Blocks: 3.5 x 2.65 x 1 mm | Coordinate: Center-aligned")
+    except Exception as e:
+        st.error(f"3D Export Error: {str(e)}")
 
 # --- Array Layout Diagram & Coordinates ---
 st.subheader("Microphone Array Layout & Coordinates")
@@ -433,3 +450,104 @@ st.success("All 12 shapes and precision coordinates are ready.")
 # Quick Re-trigger Button at the bottom for convenience
 if st.button("📄 Print Page as Report", key="bottom_print_btn"):
     components.html("<script>window.print();</script>", height=0)
+
+# --- 3D STP Model Generation ---
+def generate_stp_model(mics):
+    # Base configuration: 3.5 * 2.65 * 1 mm block
+    # Note on coordinates:
+    # User X (Up) -> Standard Plot Y
+    # User Y (Left) -> Standard Plot -X
+    # CAD Coordinate: Standard CAD X, Y, Z
+    # We will map:
+    # CAD X = User X = Standard Plot Y
+    # CAD Y = User Y = Standard Plot -X
+    
+    # Start with a base plate to hold the mics (optional, but good for 3D printing)
+    # Let's make individual small blocks first as requested.
+    
+    model = cq.Workplane("XY")
+    
+    for i, (mx, my) in enumerate(mics):
+        ux = my   # User X
+        uy = -mx  # User Y
+        
+        # Create a block at the coordinate point (center)
+        # 3.5 is length (X direction), 2.65 is width (Y direction), 1 is height (Z)
+        block = cq.Workplane("XY").box(3.5, 2.65, 1).translate((ux, uy, 0.5))
+        model = model.union(block)
+        
+    # Export to a temporary file path
+    import tempfile
+    import os
+    tmp_path = os.path.join(tempfile.gettempdir(), "mic_array.step")
+    cq.exporters.export(model, tmp_path)
+    
+    with open(tmp_path, "rb") as f:
+        data = f.read()
+    
+    os.remove(tmp_path)
+    return data
+
+def generate_32_mic_stp():
+    import cadquery as cq
+    import io
+    
+    radii = [35.0, 45.0, 60.0, 80.0]
+    SQRT3 = np.sqrt(3)
+    
+    # 1. Create Base Board (230x230x2mm) centered at XY=0,0
+    model = cq.Workplane("XY").box(230, 230, 2.0).translate((0, 0, 1.0))
+    
+    # 2. Add 32 Mics (3.5x2.65x1.0mm) 
+    for R in radii:
+        mics_std = np.array([
+            [R, 0], [R/2, -R*SQRT3/2], [-R/2, -R*SQRT3/2], [-R, 0],
+            [-R/2, R*SQRT3/2], [R/2, R*SQRT3/2],
+            [R/2 + (SQRT3-1)*R, R*SQRT3/2], [R/2 + (SQRT3-1)*R, -R*SQRT3/2]
+        ])
+        
+        for px, py in mics_std:
+            # User orientation: X-Up, Y-Left
+            ux, uy = py, -px 
+            # Place block on top of board (elevation 2.0)
+            block = cq.Workplane("XY").box(3.5, 2.65, 1.0).translate((uy, ux, 2.5))
+            model = model.union(block)
+            
+    out = io.BytesIO()
+    model.val().exportStep(out)
+    return out.getvalue()
+
+# --- Debug Info (Remove in final version) ---
+with st.expander("Debug Info (Remove in final version)"):
+    st.subheader("Session State")
+    st.write(st.session_state)
+    
+    st.subheader("Microphone Layout (M1-M8)")
+    st.write(mics)
+    
+    st.subheader("Shapes to Show")
+    st.write(shapes_to_show)
+    
+    # Check if the functions are working
+    if st.button("Test Generate STP"):
+        try:
+            stp_test = generate_stp_model(mics)
+            st.success("STP Model generated successfully!")
+        except Exception as e:
+            st.error(f"Error in STP Generation: {e}")
+    
+    if st.button("Test 32-Mic STP"):
+        try:
+            stp_32_test = generate_32_mic_stp()
+            st.success("32-Mic STP Model generated successfully!")
+        except Exception as e:
+            st.error(f"Error in 32-Mic STP Generation: {e}")
+
+# --- Footer Note ---
+st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown(
+    "🔧 **Developer Note:** This section is for debugging and development purposes. "
+    "It provides insights into the session state, microphone layout, and available shapes. "
+    "Buttons are included to test the generation of STP models directly. **Remove or hide this section in the final release.**",
+    unsafe_allow_html=True
+)
