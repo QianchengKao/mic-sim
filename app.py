@@ -74,8 +74,6 @@ def get_mic_layout(R):
 
 mics = get_mic_layout(final_r)
 
-    ])
-
 def get_polygon_data(mics, indices):
     """Calculates sides, internal angles and vertices for a given subset of mics."""
     subset = []
