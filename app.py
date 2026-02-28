@@ -153,43 +153,31 @@ def create_pdf_report(mics, r_val, d_val, shapes, polygon_func):
 
 # --- Export Report Feature ---
 st.subheader("📊 Report Center")
-col_e1, col_e2 = st.columns(2)
 
-with col_e1:
-    if st.button("📄 Generate PDF Report (Stable Version)"):
-        # Generate the PDF in background
-        with st.spinner("Generating High-Quality PDF..."):
-            pdf_buf = create_pdf_report(mics, final_r, st.session_state.d_val, shapes_to_show, get_polygon_data)
-            st.download_button(
-                label="⬇️ Download PDF Report",
-                data=pdf_buf,
-                file_name=f"MicArray_Report_D{st.session_state.d_val}mm.pdf",
-                mime="application/pdf"
-            )
-            st.success("PDF Ready! Click the download button.")
-
-with col_e2:
-    if st.button("🖨️ Browser Printing Mode (Alt)"):
-        st.info("ℹ️ To save: 1. Press **Ctrl + P** (Win) or **Cmd + P** (Mac) manually. 2. Set 'Destination' to 'Save as PDF'.")
-        # Simplify page for printing and force page breaks correctly
-        print_styles = """
-            <style>
-                @media print {
-                    /* Hide navigation, buttons and extra UI */
-                    .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"], #MainMenu {
-                        display: none !important;
-                    }
-                    /* Reset page margins and container width */
-                    .main .block-container {
-                        padding-top: 10mm !important;
-                        padding-bottom: 10mm !important;
-                        max-width: 100% !important;
-                    }
+if st.button("🖨️ Prepare Page for Printing (PDF Mode)"):
+    st.info("ℹ️ To save as PDF: 1. Press **Ctrl + P** (Win) or **Cmd + P** (Mac) manually. 2. Set 'Destination' to 'Save as PDF'.")
+    # Simplify page for printing and force page breaks correctly
+    print_styles = """
+        <style>
+            @media print {
+                /* Hide navigation, buttons and extra UI */
+                .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"], #MainMenu {
+                    display: none !important;
                 }
-            </style>
-        """
-        st.markdown(print_styles, unsafe_allow_html=True)
-        st.success("✅ Layout optimized. Please use your browser's print shortcut (Cmd+P or Ctrl+P).")
+                /* Reset page margins and container width */
+                .main .block-container {
+                    padding-top: 10mm !important;
+                    padding-bottom: 10mm !important;
+                    max-width: 100% !important;
+                }
+                /* Space out sections */
+                stDivider { page-break-after: always; }
+                div[data-testid="stPyplot"] { page-break-inside: avoid; margin-bottom: 20px; }
+            }
+        </style>
+    """
+    st.markdown(print_styles, unsafe_allow_html=True)
+    st.success("✅ Layout optimized. You can now use your browser's print shortcut (Cmd+P or Ctrl+P) to save as PDF.")
 
 # --- Array Layout Diagram & Coordinates ---
 st.subheader("Microphone Array Layout & Coordinates")
