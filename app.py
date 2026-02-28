@@ -200,6 +200,18 @@ with col_e2:
         st.session_state.print_mode = True
     
     # CSV 导出功能
+    # Extract coordinate list for CSV export
+    coord_list_export = []
+    for i, (mx, my) in enumerate(mics):
+        # User X is UP (standard Y), User Y is LEFT (standard -X)
+        user_x = my
+        user_y = -mx
+        coord_list_export.append({
+            "Mic": f"M{i+1}",
+            "X [mm]": round(user_x, 6),
+            "Y [mm]": round(user_y, 6)
+        })
+    df_coords = pd.DataFrame(coord_list_export)
     csv_data = df_coords.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Download Coordinates (CSV)",
