@@ -103,6 +103,134 @@ with col_l:
 final_r = st.session_state.r_val
 mics = get_mic_layout(final_r)
 
+# --- PDF Generation Function ---
+def create_pdf_report(mics, r_val, d_val, shapes, polygon_func):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    elements.append(Paragraph(f"Microphone Array Simulator Report", styles['Title']))
+    elements.append(Paragraph(f"Configuration: Radius R={r_val}mm, Diameter D={d_val}mm", styles['Normal']))
+    elements.append(Spacer(1, 12))
+    
+    # 1. Main Layout Table
+    elements.append(Paragraph("1. Microphone Coordinates (M1-M8)", styles['Heading2']))
+    elements.append(Paragraph("System: X+ (Up), Y+ (Left)", styles['Italic']))
+    
+    coord_data = [["Mic", "X [mm]", "Y [mm]"]]
+    for i, (mx, my) in enumerate(mics):
+        coord_data.append([f"M{i+1}", f"{my:.4f}", f"{-mx:.4f}"])
+    
+    t = Table(coord_data, colWidths=[60, 100, 100])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER')
+    ]))
+    elements.append(t)
+    elements.append(PageBreak())
+    
+    # 2. Sub-array Geometry Summary
+    elements.append(Paragraph("2. Sub-array Analysis Summary", styles['Heading2']))
+    summary_table_data = [["Shape", "Sides [mm]", "Angles [°]"]]
+    for s in shapes:
+        data = polygon_func(mics, s["indices"])
+        sides_str = ", ".join([f"{x:.1f}" for x in data['sides']])
+        angles_str = ", ".join([f"{x:.0f}" for x in data['angles']])
+        summary_table_data.append([s["name"], sides_str, angles_str])
+        
+    t_sum = Table(summary_table_data, colWidths=[180, 150, 120])
+    t_sum.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (0, 1), (-1, -1), 'LEFT')
+    ]))
+    elements.append(t_sum)
+    elements.append(PageBreak())
+
+    # 3. Individual Plots (One per page or two per page)
+    elements.append(Paragraph("3. Sub-array Plots", styles['Heading2']))
+    for i, s in enumerate(shapes):
+        elements.append(Paragraph(f"Shape {i+1}: {s['name']}", styles['Heading3']))
+        
+        # Create a temp figure for PDF
+        tmp_fig, tmp_ax = plt.subplots(figsize=(4, 4))
+        indices = s["indices"]
+        data = polygon_func(mics, indices)
+        circle_bg = plt.Circle((0, 0), r_val, color='lightgray', fill=False, linestyle='--')
+        tmp_ax.add_patch(circle_bg)
+        v = data['vertices']
+        
+        if indices == (0, 1, 2, 3, 4, 5): # Hexagon/Circle
+            theta = np.linspace(0, 2*np.pi, 200)
+            tmp_ax.plot(r_val * np.cos(theta), r_val * np.sin(theta), color='blue', lw=2)
+        else:
+            v_plot = np.concatenate((v, [v[0]]), axis=0)
+            tmp_ax.plot(v_plot[:, 0], v_plot[:, 1], 'b-', lw=2)
+            
+        tmp_ax.scatter(v[:, 0], v[:, 1], color='black', s=40)
+        tmp_ax.set_aspect('equal')
+        tmp_ax.axis('off')
+        
+        img_buf = io.BytesIO()
+        tmp_fig.savefig(img_buf, format='png', bbox_inches='tight', dpi=100)
+        plt.close(tmp_fig)
+        
+        img_buf.seek(0)
+        elements.append(Image(img_buf, width=250, height=250))
+        # Add page break every 2 plots to keep it neat
+        if (i+1) % 2 == 0:
+            elements.append(PageBreak())
+        else:
+            elements.append(Spacer(1, 20))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+# --- Export Report Feature ---
+st.subheader("📊 Report Center")
+col_e1, col_e2 = st.columns(2)
+
+with col_e1:
+    if st.button("📄 Generate PDF Report (Stable Version)"):
+        # Generate the PDF in background
+        with st.spinner("Generating High-Quality PDF..."):
+            pdf_buf = create_pdf_report(mics, final_r, st.session_state.d_val, shapes_to_show, get_polygon_data)
+            st.download_button(
+                label="⬇️ Download PDF Report",
+                data=pdf_buf,
+                file_name=f"MicArray_Report_D{st.session_state.d_val}mm.pdf",
+                mime="application/pdf"
+            )
+            st.success("PDF Ready! Click the download button.")
+
+with col_e2:
+    if st.button("🖨️ Browser Printing Mode (Alt)"):
+        st.info("ℹ️ To save: 1. Press **Ctrl + P** (Win) or **Cmd + P** (Mac) manually. 2. Set 'Destination' to 'Save as PDF'.")
+        # Simplify page for printing and force page breaks correctly
+        print_styles = """
+            <style>
+                @media print {
+                    /* Hide navigation, buttons and extra UI */
+                    .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"], #MainMenu {
+                        display: none !important;
+                    }
+                    /* Reset page margins and container width */
+                    .main .block-container {
+                        padding-top: 10mm !important;
+                        padding-bottom: 10mm !important;
+                        max-width: 100% !important;
+                    }
+                }
+            </style>
+        """
+        st.markdown(print_styles, unsafe_allow_html=True)
+        st.success("✅ Layout optimized. Please use your browser's print shortcut (Cmd+P or Ctrl+P).")
+
 # --- Array Layout Diagram & Coordinates ---
 st.subheader("Microphone Array Layout & Coordinates")
 col_plot, col_table = st.columns([1.2, 1])
@@ -349,96 +477,11 @@ for shape in shapes_to_show:
 
 st.table(summary_data)  # Use st.table for the printable report instead of st.dataframe
 
+# Move the duplicate report block at the top if it exists
+# (Already handled by the previous replacement)
+
 st.success("All 12 shapes and precision coordinates are ready.")
 
-# --- PDF Generation Function ---
-def create_pdf_report(mics, r_val, d_val, shapes, polygon_func):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-    elements = []
-    styles = getSampleStyleSheet()
-    
-    # Title
-    elements.append(Paragraph(f"Microphone Array Simulator Report", styles['Title']))
-    elements.append(Paragraph(f"Configuration: Radius R={r_val}mm, Diameter D={d_val}mm", styles['Normal']))
-    elements.append(Spacer(1, 12))
-    
-    # 1. Main Layout Table
-    elements.append(Paragraph("1. Microphone Coordinates (M1-M8)", styles['Heading2']))
-    elements.append(Paragraph("System: X+ (Up), Y+ (Left)", styles['Italic']))
-    
-    coord_data = [["Mic", "X [mm]", "Y [mm]"]]
-    for i, (mx, my) in enumerate(mics):
-        coord_data.append([f"M{i+1}", f"{my:.4f}", f"{-mx:.4f}"])
-    
-    t = Table(coord_data, colWidths=[60, 100, 100])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER')
-    ]))
-    elements.append(t)
-    elements.append(PageBreak())
-    
-    # 2. Sub-array Geometry Summary
-    elements.append(Paragraph("2. Sub-array Analysis Summary", styles['Heading2']))
-    summary_table_data = [["Shape", "Sides [mm]", "Angles [°]"]]
-    for s in shapes:
-        data = polygon_func(mics, s["indices"])
-        sides_str = ", ".join([f"{x:.1f}" for x in data['sides']])
-        angles_str = ", ".join([f"{x:.0f}" for x in data['angles']])
-        summary_table_data.append([s["name"], sides_str, angles_str])
-        
-    t_sum = Table(summary_table_data, colWidths=[180, 150, 120])
-    t_sum.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (0, 1), (-1, -1), 'LEFT')
-    ]))
-    elements.append(t_sum)
-    elements.append(PageBreak())
-
-    # 3. Individual Plots (One per page or two per page)
-    elements.append(Paragraph("3. Sub-array Plots", styles['Heading2']))
-    for i, s in enumerate(shapes):
-        elements.append(Paragraph(f"Shape {i+1}: {s['name']}", styles['Heading3']))
-        
-        # Create a temp figure for PDF
-        tmp_fig, tmp_ax = plt.subplots(figsize=(4, 4))
-        indices = s["indices"]
-        data = polygon_func(mics, indices)
-        circle_bg = plt.Circle((0, 0), r_val, color='lightgray', fill=False, linestyle='--')
-        tmp_ax.add_patch(circle_bg)
-        v = data['vertices']
-        
-        if indices == (0, 1, 2, 3, 4, 5): # Hexagon/Circle
-            theta = np.linspace(0, 2*np.pi, 200)
-            tmp_ax.plot(r_val * np.cos(theta), r_val * np.sin(theta), color='blue', lw=2)
-        else:
-            v_plot = np.concatenate((v, [v[0]]), axis=0)
-            tmp_ax.plot(v_plot[:, 0], v_plot[:, 1], 'b-', lw=2)
-            
-        tmp_ax.scatter(v[:, 0], v[:, 1], color='black', s=40)
-        tmp_ax.set_aspect('equal')
-        tmp_ax.axis('off')
-        
-        img_buf = io.BytesIO()
-        tmp_fig.savefig(img_buf, format='png', bbox_inches='tight', dpi=100)
-        plt.close(tmp_fig)
-        
-        img_buf.seek(0)
-        elements.append(Image(img_buf, width=250, height=250))
-        # Add page break every 2 plots to keep it neat
-        if (i+1) % 2 == 0:
-            elements.append(PageBreak())
-        else:
-            elements.append(Spacer(1, 20))
-
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
 # Quick Re-trigger Button at the bottom for convenience
-if st.button("📄 Print Page as Report"):
+if st.button("📄 Print Page as Report", key="bottom_print_btn"):
     components.html("<script>window.print();</script>", height=0)
