@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import io
-import ezdxf  # Replaces cadquery for universal compatibility
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Microphone Array Simulator", layout="wide")
@@ -193,22 +192,20 @@ with col_e1:
         st.success("✅ Layout optimized. You can now use your browser's print shortcut (Cmd+P or Ctrl+P) to save as PDF.")
 
 with col_e2:
-    # 简化在线版：仅保留 CSV 坐标导出，移除 STP/DXF 避免云端报错
-    # 3D 导出已通过本地脚本 generate_3d_report.py 实现
-    csv_coords = []
-    for i, (mx, my) in enumerate(mics):
-        csv_coords.append({"Mic": f"M{i+1}", "X": round(my, 6), "Y": round(-mx, 6)})
-    df_download = pd.DataFrame(csv_coords)
-    csv_data = df_download.to_csv(index=False).encode('utf-8')
+    st.subheader("🛠️ Engineering Tools")
+    # 简化在线版：仅保留 2D 平面报告和 CSV，确保云端稳定性
+    if st.button("🖨️ Prepare Print Report"):
+        st.info("💡 Tip: Use 'Ctrl+P' or 'Cmd+P' to save as PDF. The UI will hide sidebar automatically.")
+        st.session_state.print_mode = True
     
+    # CSV 导出功能
+    csv_data = df_coords.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Download Coordinates CSV",
+        label="📥 Download Coordinates (CSV)",
         data=csv_data,
-        file_name=f"mic_coords_R{final_r}mm.csv",
-        mime="text/csv",
-        help="Export all 8 coordinates to a CSV file (X-Up, Y-Left system)."
+        file_name=f"mic_coords_R{final_r}.csv",
+        mime="text/csv"
     )
-    st.info("💡 3D models (STP/DXF) are generated locally using the provided scripts for maximum reliability.")
 
 # --- Array Layout Diagram & Coordinates ---
 st.subheader("Microphone Array Layout & Coordinates")
@@ -464,111 +461,6 @@ st.success("All 12 shapes and precision coordinates are ready.")
 # Quick Re-trigger Button at the bottom for convenience
 if st.button("📄 Print Page as Report", key="bottom_print_btn"):
     components.html("<script>window.print();</script>", height=0)
-
-# --- 3D STP Model Generation ---
-def generate_stp_model(mics):
-    # Base configuration: 3.5 * 2.65 * 1 mm block
-    # Note on coordinates:
-    # User X (Up) -> Standard Plot Y
-    # User Y (Left) -> Standard Plot -X
-    # CAD Coordinate: Standard CAD X, Y, Z
-    # We will map:
-    # CAD X = User X = Standard Plot Y
-    # CAD Y = User Y = Standard Plot -X
-    
-    # Start with a base plate to hold the mics (optional, but good for 3D printing)
-    # Let's make individual small blocks first as requested.
-    
-    model = cq.Workplane("XY")
-    
-    for i, (mx, my) in enumerate(mics):
-        ux = my   # User X
-        uy = -mx  # User Y
-        
-        # Create a block at the coordinate point (center)
-        # 3.5 is length (X direction), 2.65 is width (Y direction), 1 is height (Z)
-        block = cq.Workplane("XY").box(3.5, 2.65, 1).translate((ux, uy, 0.5))
-        model = model.union(block)
-        
-    # Export to a temporary file path
-    import tempfile
-    import os
-    tmp_path = os.path.join(tempfile.gettempdir(), "mic_array.step")
-    cq.exporters.export(model, tmp_path)
-    
-    with open(tmp_path, "rb") as f:
-        data = f.read()
-    
-    os.remove(tmp_path)
-    return data
-
-def generate_32_mic_stp():
-    import cadquery as cq
-    import io
-    
-    radii = [35.0, 45.0, 60.0, 80.0]
-    SQRT3 = np.sqrt(3)
-    
-    # 1. Create Base Board (230x230x2mm) centered at XY=0,0
-    model = cq.Workplane("XY").box(230, 230, 2.0).translate((0, 0, 1.0))
-    
-    # 2. Add 32 Mics (3.5x2.65x1.0mm) 
-    for R in radii:
-        mics_std = np.array([
-            [R, 0], [R/2, -R*SQRT3/2], [-R/2, -R*SQRT3/2], [-R, 0],
-            [-R/2, R*SQRT3/2], [R/2, R*SQRT3/2],
-            [R/2 + (SQRT3-1)*R, R*SQRT3/2], [R/2 + (SQRT3-1)*R, -R*SQRT3/2]
-        ])
-        
-        for px, py in mics_std:
-            # User orientation: X-Up, Y-Left
-            ux, uy = py, -px 
-            # Place block on top of board (elevation 2.0)
-            block = cq.Workplane("XY").box(3.5, 2.65, 1.0).translate((uy, ux, 2.5))
-            model = model.union(block)
-            
-    out = io.BytesIO()
-    model.val().exportStep(out)
-    return out.getvalue()
-
-# --- DXF Generation for 32 Mic Layout ---
-def generate_32_mic_dxf():
-    import ezdxf
-    import io
-    
-    radii = [35.0, 45.0, 60.0, 80.0]
-    SQRT3 = np.sqrt(3)
-    board_size = 230
-    half = board_size / 2
-    
-    doc = ezdxf.new('R2010')
-    msp = doc.modelspace()
-    
-    # 1. Base Board (2mm Thick via thickness attribute)
-    msp.add_lwpolyline(
-        [(-half, -half), (half, -half), (half, half), (-half, half), (-half, -half)],
-        dxfattribs={'thickness': 2.0, 'color': 7}
-    )
-    
-    # 2. Add 32 Mics as boxes (1mm thick) at elevation 2mm
-    colors = [1, 2, 3, 4] 
-    for idx, R in enumerate(radii):
-        mics_std = np.array([
-            [R, 0], [R/2, -R*SQRT3/2], [-R/2, -R*SQRT3/2], [-R, 0],
-            [-R/2, R*SQRT3/2], [R/2, R*SQRT3/2],
-            [R/2 + (SQRT3-1)*R, R*SQRT3/2], [R/2 + (SQRT3-1)*R, -R*SQRT3/2]
-        ])
-        
-        for px, py in mics_std:
-            ux, uy = py, -px 
-            msp.add_lwpolyline(
-                [(uy-3.5/2, ux-2.65/2), (uy+3.5/2, ux-2.65/2), (uy+3.5/2, ux+2.65/2), (uy-3.5/2, ux+2.65/2), (uy-3.5/2, ux-2.65/2)],
-                dxfattribs={'thickness': 1.0, 'elevation': 2.0, 'color': colors[idx]}
-            )
-            
-    out = io.StringIO()
-    doc.write(out)
-    return out.getvalue()
 
 # --- Debug Info (Remove in final version) ---
 with st.expander("Debug Info (Remove in final version)"):
