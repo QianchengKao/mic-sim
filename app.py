@@ -24,25 +24,46 @@ st.title("Microphone Array Simulator")
 # --- Export Report Feature ---
 if st.button("📄 Prepare Report for Printing"):
     st.info("ℹ️ To save as PDF: 1. Press **Ctrl + P** (Win) or **Cmd + P** (Mac) manually. 2. Set 'Destination' to 'Save as PDF'.")
-    # Simplify page for printing
+    # Simplify page for printing and force page breaks correctly
     print_styles = """
         <style>
             @media print {
+                /* Hide navigation, buttons and extra UI */
                 .stButton, header, footer, [data-testid="stToolbar"], .stInfo, [data-testid="stExpander"], #MainMenu {
                     display: none !important;
                 }
+                
+                /* Reset page margins and container width */
                 .main .block-container {
-                    padding-top: 0 !important;
+                    padding-top: 10mm !important;
+                    padding-bottom: 10mm !important;
                     max-width: 100% !important;
                 }
-                div[data-testid="stPyplot"], .stTable {
-                    page-break-inside: avoid;
+
+                /* FORCE PAGE BREAKS between major sections to prevent overlap */
+                .stDivider {
+                    page-break-after: always !important;
+                    visibility: hidden;
+                    height: 0;
+                    margin: 0;
+                }
+
+                /* PREVENT IMAGES AND TABLES FROM BEING CUT OFF */
+                div[data-testid="stPyplot"], .stTable, [data-testid="stMetric"] {
+                    page-break-inside: avoid !important;
+                }
+
+                /* Ensure the grid of sub-arrays stays well-behaved (3-column layout) */
+                [data-testid="column"] {
+                    width: 33% !important;
+                    flex: 1 1 33% !important;
+                    min-width: 33% !important;
                 }
             }
         </style>
     """
     st.markdown(print_styles, unsafe_allow_html=True)
-    st.success("✅ Page is now optimized for printing. Please use your browser's print shortcut (Cmd+P or Ctrl+P).")
+    st.success("✅ Page layout optimized for printing. Graphs and tables will now stay intact and on appropriate pages.")
 
 # --- Simple Design Parameters ---
 if 'r_val' not in st.session_state:
