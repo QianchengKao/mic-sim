@@ -1,17 +1,12 @@
+# 1. Imports
 import streamlit as st
-import streamlit.components.v1 as components
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 import io
-import cadquery as cq
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Image, Paragraph, Spacer, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
-from geometry import get_mic_layout, get_polygon_data
+import ezdxf  # Replaces cadquery for universal compatibility
 
+# --- Page Configuration ---
 st.set_page_config(page_title="Microphone Array Simulator", layout="wide")
 
 # --- Hide Streamlit Header, Footer, and Profile ---
@@ -515,6 +510,45 @@ def generate_32_mic_stp():
             
     out = io.BytesIO()
     model.val().exportStep(out)
+    return out.getvalue()
+
+# --- DXF Generation for 32 Mic Layout ---
+def generate_32_mic_dxf():
+    import ezdxf
+    import io
+    
+    radii = [35.0, 45.0, 60.0, 80.0]
+    SQRT3 = np.sqrt(3)
+    board_size = 230
+    half = board_size / 2
+    
+    doc = ezdxf.new('R2010')
+    msp = doc.modelspace()
+    
+    # 1. Base Board (2mm Thick via thickness attribute)
+    msp.add_lwpolyline(
+        [(-half, -half), (half, -half), (half, half), (-half, half), (-half, -half)],
+        dxfattribs={'thickness': 2.0, 'color': 7}
+    )
+    
+    # 2. Add 32 Mics as boxes (1mm thick) at elevation 2mm
+    colors = [1, 2, 3, 4] 
+    for idx, R in enumerate(radii):
+        mics_std = np.array([
+            [R, 0], [R/2, -R*SQRT3/2], [-R/2, -R*SQRT3/2], [-R, 0],
+            [-R/2, R*SQRT3/2], [R/2, R*SQRT3/2],
+            [R/2 + (SQRT3-1)*R, R*SQRT3/2], [R/2 + (SQRT3-1)*R, -R*SQRT3/2]
+        ])
+        
+        for px, py in mics_std:
+            ux, uy = py, -px 
+            msp.add_lwpolyline(
+                [(uy-3.5/2, ux-2.65/2), (uy+3.5/2, ux-2.65/2), (uy+3.5/2, ux+2.65/2), (uy-3.5/2, ux+2.65/2), (uy-3.5/2, ux-2.65/2)],
+                dxfattribs={'thickness': 1.0, 'elevation': 2.0, 'color': colors[idx]}
+            )
+            
+    out = io.StringIO()
+    doc.write(out)
     return out.getvalue()
 
 # --- Debug Info (Remove in final version) ---
